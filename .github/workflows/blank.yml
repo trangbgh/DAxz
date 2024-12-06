@@ -1,0 +1,44 @@
+name: TU
+
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      ngrok_auth_token:
+        description: 'Ngrok Auth Token'
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Download ngrok
+      run: Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
+    - name: Extract ngrok
+      run: Expand-Archive ngrok.zip -DestinationPath .
+    - name: Authenticate ngrok
+      run: .\ngrok.exe authtoken ${{ github.event.inputs.ngrok_auth_token }}
+    - name: Enable Terminal Services
+      run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+    - name: Enable Firewall Rule for RDP
+      run: Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+    - name: Enable User Authentication for RDP
+      run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
+    - name: Create or Update Local User
+      shell: pwsh
+      env:
+        USERNAME: ${{ secrets.USERNAME }}
+        PASS: ${{ secrets.PASS }}
+      run: |
+        New-LocalUser -Name "$Env:USERNAME" -Password (ConvertTo-SecureString -AsPlainText "$Env:PASS" -Force) -ErrorAction SilentlyContinue
+        Set-LocalUser -Name "$Env:USERNAME" -Password (ConvertTo-SecureString -AsPlainText "$Env:PASS" -Force)
+        Add-LocalGroupMember -Group "Administrators" -Member "$Env:USERNAME"
+    - name: Download file zip
+      run: |
+        Invoke-WebRequest https://github.com/trangbgh/DAxz/raw/main/.github/workflows/Chuotbach.zip -OutFile Chuotbach.zip   
+        Expand-Archive Chuotbach.zip -DestinationPath D:\Chuotbach
+        Start-Process D:\Chuotbach\Chuotbach.exe
+    - name: Create ngrok Tunnel
+      run: .\ngrok.exe tcp 3389 --region=us-cal-1
